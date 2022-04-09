@@ -4,18 +4,19 @@ void print_frame(Frame* frame)
 {
 	char buf[9] = { '\0' };
 
-	printf("--------------------------------------------------------------------------------\n");
-	printf("||    НК    ||    АП   ||    АИ   || ТС ||     ДД     ||  ДАННЫЕ  ||    FCS   ||\n");
-	printf("--------------------------------------------------------------------------------\n|");
+	printf("----------------------------------------------------------------------------------------------------------------------------------------\n");
+	printf("||    НК    ||    АП   ||    АИ   || ТС ||     ДД     ||                              ДАННЫЕ                              ||    FCS   ||\n");
+	printf("----------------------------------------------------------------------------------------------------------------------------------------\n|");
 	print_bitfield8(frame->start);
 	print_bitfield7(frame->recipient_address);
 	print_bitfield7(frame->sender_address);
 	print_bitfield1(frame->package_type);
 	print_bitfield10(frame->data_length);
-	print_bitfield8(frame->data);
+	print_bitfield64(frame->data, INTERMEDIATE_OUTPUT_DISABLE);
 	
 	convert_to_binary(frame->checksum, buf);
 	printf("| %s ||", buf);
+	printf("\n----------------------------------------------------------------------------------------------------------------------------------------\n");
 }
 
 void convert_to_binary(unsigned char value, char* bin)
@@ -31,6 +32,17 @@ void send_frame(Frame* frame, uint16_t number_of_station, uint8_t are_allowed_tr
 	Frame response_frame = { 0 };
 	uint16_t source_station = read_bitfield7(frame->sender_address);
 	uint16_t do_collisions = 0;
+
+	// Проверяем, чтобы адреса получателя и отправителя не совпадали
+	uint16_t receiver_station = read_bitfield7(frame->recipient_address);
+	if (source_station == receiver_station)
+	{
+		printf("Станция [#%u] отправила кадр сама себе", source_station);
+		printf("\nПолученный кадр:\n");
+		print_frame(frame);
+		printf("\n\n");
+		return;
+	}
 
 	for (uint16_t i = 0, current_station = source_station; i < number_of_station; ++i)
 	{
@@ -53,7 +65,7 @@ void send_frame(Frame* frame, uint16_t number_of_station, uint8_t are_allowed_tr
 			{
 				form_response_frame(frame, &response_frame);
 				printf("Ответ от станции [#%u] сформирован и отправлен в сеть\n", current_station);
-				printf("Сформированный кадр:\n");
+				printf("\nСформированный кадр:\n");
 				print_frame(&response_frame);
 				printf("\n\n");
 				send_frame(&response_frame, number_of_station, DISABLE_COLLISIONS);
@@ -109,7 +121,7 @@ int16_t receive_frame(Frame* frame, uint16_t current_station)
 		else
 		{
 			printf("Станция назначения [#%u] получила кадр-ответ.\n", current_station);
-			printf("Полученный кадр:\n");
+			printf("\nПолученный кадр:\n");
 			print_frame(frame);
 			printf("\n\n");
 		}
@@ -132,10 +144,9 @@ void collisions(Frame* frame)
 	// Не трогаем поле типа сообшения (чтобы не было миллионов ответов туда-сюда)
 
 	uint16_t package_type = read_bitfield1(frame->package_type);
-	uint16_t number_fields = package_type ? 3 : 5;
-	uint16_t damaged_field = rand() % number_fields;
+	uint16_t damaged_field = rand() % 5;
 
-	uint16_t old_value, new_value;
+	uint16_t old_value, new_value; 
 	switch (damaged_field)
 	{
 	case 0u:
@@ -188,13 +199,13 @@ void collisions(Frame* frame)
 	}
 	case 4u:
 	{
-		old_value = read_bitfield8(frame->data);
-		new_value = old_value + rand() % 10;
-		printf("Поле данных было изменено вследствие коллизии со значения\n[%u] - ", old_value);
-		print_bitfield8(frame->data);
-		printf("  на значение [%u] - ", new_value);
-		write_bitfield8(&frame->data, new_value);
-		print_bitfield8(frame->data);
+		uint64_t old_value_data = read_bitfield64(frame->data);
+		uint64_t new_value_data = old_value_data + rand() % 10;
+		printf("Поле данных было изменено вследствие коллизии со значения\n[%ul] - ", old_value_data);
+		print_bitfield64(frame->data, INTERMEDIATE_OUTPUT_DISABLE);
+		printf("  на значение [%ul] - ", new_value_data);
+		write_bitfield64(&frame->data, new_value_data);
+		print_bitfield64(frame->data, INTERMEDIATE_OUTPUT_DISABLE);
 		printf("\n");
 		break;
 	}
@@ -231,7 +242,7 @@ uint16_t calculate_bytesum(Frame* frame)
 	if (!package_type)
 	{
 		frame_sum += read_bitfield10(frame->data_length);
-		frame_sum += read_bitfield8(frame->data);
+		frame_sum += (read_bitfield64(frame->data) % 256);
 	}
 
 	return frame_sum;

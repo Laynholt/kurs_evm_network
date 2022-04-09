@@ -16,7 +16,7 @@ typedef struct Frame
 	Bitfield7 sender_address;
 	Bitfield1 package_type;
 	Bitfield10 data_length;
-	Bitfield8 data;
+	Bitfield64 data;
 	unsigned char checksum;
 
 }Frame;

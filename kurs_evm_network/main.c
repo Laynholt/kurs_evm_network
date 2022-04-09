@@ -19,6 +19,7 @@ int main()
 	Frame frame = { 0 };
 	uint16_t nquit = 1;
 	uint16_t value;
+	uint64_t data_value;
 
 	write_bitfield8(&frame.start, DEFAULT_START_FRAME);
 	while (nquit)
@@ -43,19 +44,19 @@ int main()
 		}
 		write_bitfield7(&frame.recipient_address, value);
 
-		printf("Введите данные[в виде числа в 10 СС](число от 0 до 256): ");
-		scanf("%u", &value);
-		write_bitfield8(&frame.data, value);
+		printf("Введите данные[в виде числа в 10 СС](число от 0 до 2^64): ");
+		scanf("%u", &data_value);
+		write_bitfield64(&frame.data, data_value);
 
 		// Стандартная длина данных будет 8 бит, так как 
 		// максимальное значение в данных 256 для наглядности
-		write_bitfield10(&frame.data_length, 8);
+		write_bitfield10(&frame.data_length, 64);
 
 		unsigned char checksum = calculate_checksum(&frame);
 		write_bitfield8(&frame.checksum, checksum);
 
 		// Отображаем введенный кадр
-		printf("Отправляемый кадр:\n");
+		printf("\nОтправляемый кадр:\n");
 		print_frame(&frame);
 		printf("\n\n");
 
